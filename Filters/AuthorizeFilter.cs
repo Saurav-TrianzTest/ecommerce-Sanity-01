@@ -157,7 +157,8 @@ namespace EcommerceWebApi.Filters
 
                 user = _userService.GetUserByToken(token: refreshTokenString);
 
-                if (user == null || user.RefreshToken.Expires < DateTime.Now)
+                // .NET 10: Use DateTime.UtcNow instead of DateTime.Now for consistent UTC-based comparison
+                if (user == null || user.RefreshToken.Expires < DateTime.UtcNow)
                 {
                     context.Result = new ContentResult()
                     {

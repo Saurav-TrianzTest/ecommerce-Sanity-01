@@ -29,7 +29,9 @@ builder.Services
     .AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// .NET 10: Use built-in OpenAPI support (AddOpenApi/MapOpenApi) instead of Swashbuckle.
+// Swashbuckle.AspNetCore 8.x is used here for compatibility; switch to AddOpenApi() for native support.
+builder.Services.AddOpenApi();
 
 builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("ApplicationSettings"));
 
@@ -63,8 +65,13 @@ builder.Services.AddSingleton<NotificationSubject>();
 var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    // .NET 10 built-in OpenAPI endpoint
+    app.MapOpenApi();
+    // Swagger UI via Swashbuckle (requires Swashbuckle.AspNetCore 8.x)
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/openapi/v1.json", "EcommerceWebApi v1");
+    });
 }
 
 app.UseCors();

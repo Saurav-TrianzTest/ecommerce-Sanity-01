@@ -45,7 +45,8 @@ namespace EcommerceWebApi.Services
                 {
                     UserId = userId,
                     ProductList = productList,
-                    Created = DateTime.Now,
+                    // .NET 10: Use DateTime.UtcNow instead of DateTime.Now for consistent UTC-based timestamps
+                    Created = DateTime.UtcNow,
                     Status = OrderStatus.Pending
                 };
 
@@ -200,7 +201,8 @@ namespace EcommerceWebApi.Services
                     throw new InvalidOperationException($"Current status already is {status}");
                 }
                 order.Status = status;
-                order.Updated = DateTime.Now;
+                // .NET 10: Use DateTime.UtcNow instead of DateTime.Now for consistent UTC-based timestamps
+                order.Updated = DateTime.UtcNow;
                 if (status == OrderStatus.Canceled)
                 {
                     var fillResult = await RefillProductAsync(order);
