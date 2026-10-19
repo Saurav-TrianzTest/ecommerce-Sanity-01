@@ -7,11 +7,9 @@ using Serilog;
 using Serilog.Events;
 using System.Text.Json.Serialization;
 
-var builder = WebApplication.CreateBuilder(args);
-ConfigurationManager configuration = builder.Configuration;
-
-var logger = new LoggerConfiguration().MinimumLevel
-    .Debug()
+// Configure Serilog logger
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
     .Enrich.FromLogContext()
     .WriteTo.File(
@@ -21,7 +19,12 @@ var logger = new LoggerConfiguration().MinimumLevel
         rollingInterval: RollingInterval.Day
     )
     .CreateLogger();
-builder.Logging.AddSerilog(logger);
+
+var builder = WebApplication.CreateBuilder(args);
+ConfigurationManager configuration = builder.Configuration;
+
+// Use Serilog for ASP.NET Core logging (Serilog.AspNetCore)
+builder.Host.UseSerilog();
 
 builder.Services.AddControllers();
 builder.Services
