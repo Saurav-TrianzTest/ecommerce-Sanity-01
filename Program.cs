@@ -29,7 +29,8 @@ builder.Services
     .AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// Use ASP.NET Core 10 built-in OpenAPI support instead of Swashbuckle AddSwaggerGen
+builder.Services.AddOpenApi();
 
 builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("ApplicationSettings"));
 
@@ -63,8 +64,8 @@ builder.Services.AddSingleton<NotificationSubject>();
 var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    // Use ASP.NET Core 10 built-in OpenAPI endpoint instead of UseSwagger/UseSwaggerUI
+    app.MapOpenApi();
 }
 
 app.UseCors();
