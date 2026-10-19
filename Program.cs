@@ -10,8 +10,8 @@ using System.Text.Json.Serialization;
 var builder = WebApplication.CreateBuilder(args);
 ConfigurationManager configuration = builder.Configuration;
 
-var logger = new LoggerConfiguration().MinimumLevel
-    .Debug()
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
     .Enrich.FromLogContext()
     .WriteTo.File(
@@ -21,7 +21,8 @@ var logger = new LoggerConfiguration().MinimumLevel
         rollingInterval: RollingInterval.Day
     )
     .CreateLogger();
-builder.Logging.AddSerilog(logger);
+
+builder.Host.UseSerilog();
 
 builder.Services.AddControllers();
 builder.Services
@@ -29,8 +30,6 @@ builder.Services
     .AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 
 builder.Services.AddEndpointsApiExplorer();
-// Use ASP.NET Core 10 built-in OpenAPI support instead of Swashbuckle AddSwaggerGen
-builder.Services.AddOpenApi();
 
 builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("ApplicationSettings"));
 
@@ -62,11 +61,6 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<NotificationSubject>();
 
 var app = builder.Build();
-if (app.Environment.IsDevelopment())
-{
-    // Use ASP.NET Core 10 built-in OpenAPI endpoint instead of UseSwagger/UseSwaggerUI
-    app.MapOpenApi();
-}
 
 app.UseCors();
 app.MapControllers();
