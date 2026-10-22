@@ -10,7 +10,7 @@ using System.Text.Json.Serialization;
 var builder = WebApplication.CreateBuilder(args);
 ConfigurationManager configuration = builder.Configuration;
 
-// Configure Serilog for .NET 8 using UseSerilog on the host builder
+// Configure Serilog for .NET 10 using UseSerilog on the host builder
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
@@ -32,13 +32,18 @@ builder.Services
 
 builder.Services.AddEndpointsApiExplorer();
 
-// Swagger/OpenAPI configuration for .NET 8
-builder.Services.AddSwaggerGen(options =>
+// OpenAPI configuration for .NET 10 using built-in ASP.NET Core OpenAPI support
+// (Swashbuckle replaced by Microsoft.AspNetCore.OpenApi)
+builder.Services.AddOpenApi(options =>
 {
-    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
     {
-        Title = "EcommerceWebApi",
-        Version = "v1"
+        document.Info = new Microsoft.OpenApi.Models.OpenApiInfo
+        {
+            Title = "EcommerceWebApi",
+            Version = "v1"
+        };
+        return Task.CompletedTask;
     });
 });
 
@@ -75,11 +80,8 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "EcommerceWebApi v1");
-    });
+    // Use built-in ASP.NET Core 10 OpenAPI endpoint (replaces UseSwagger/UseSwaggerUI)
+    app.MapOpenApi();
 }
 
 app.UseCors();

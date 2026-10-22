@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
+		<TargetFramework>net10.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<RootNamespace>EcommerceWebApi</RootNamespace>
@@ -12,22 +12,22 @@
 		<!-- JSON flat-file data store (no EF Core dependency needed) -->
 		<PackageReference Include="JsonFlatFileDataStore" Version="2.4.2" />
 
-		<!-- JWT Bearer authentication - .NET 8 compatible -->
-		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+		<!-- JWT Bearer authentication - .NET 10 compatible -->
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
 
-		<!-- SignalR server-side is included in Microsoft.NET.Sdk.Web for .NET 8.
+		<!-- SignalR server-side is included in Microsoft.NET.Sdk.Web for .NET 10.
 		     The client package is only needed for standalone client apps. -->
-		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.0" />
+		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.0" />
 
 		<!-- TOTP / OTP support -->
 		<PackageReference Include="Otp.NET" Version="1.4.0" />
 
-		<!-- Serilog file sink - .NET 8 compatible -->
-		<PackageReference Include="Serilog.AspNetCore" Version="8.0.0" />
-		<PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+		<!-- Serilog file sink - .NET 10 compatible -->
+		<PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+		<PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
 
-		<!-- Swagger / OpenAPI - .NET 8 compatible -->
-		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" />
+		<!-- OpenAPI support is built into ASP.NET Core 10 via Microsoft.AspNetCore.OpenApi -->
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>
