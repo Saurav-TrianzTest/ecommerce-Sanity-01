@@ -10,8 +10,9 @@ using System.Text.Json.Serialization;
 var builder = WebApplication.CreateBuilder(args);
 ConfigurationManager configuration = builder.Configuration;
 
-var logger = new LoggerConfiguration().MinimumLevel
-    .Debug()
+// Configure Serilog for .NET 8 using UseSerilog on the host builder
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
     .Enrich.FromLogContext()
     .WriteTo.File(
@@ -21,15 +22,17 @@ var logger = new LoggerConfiguration().MinimumLevel
         rollingInterval: RollingInterval.Day
     )
     .CreateLogger();
-builder.Logging.AddSerilog(logger);
 
-builder.Services.AddControllers();
+builder.Host.UseSerilog();
+
+// Register controllers once with JSON options (duplicate AddControllers() removed)
 builder.Services
     .AddControllers()
     .AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 
 builder.Services.AddEndpointsApiExplorer();
-// Updated Swagger/OpenAPI configuration for .NET 8 compatibility
+
+// Swagger/OpenAPI configuration for .NET 8
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
@@ -69,6 +72,7 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<NotificationSubject>();
 
 var app = builder.Build();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
