@@ -1,12 +1,35 @@
 ﻿using OtpNet;
+using Polly;
+using Polly.Extensions.Http;
+using System.Collections.Concurrent;
 using System.Globalization;
-using System.Web;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace EcommerceWebApi.Authentication
 {
     public class TotpService : ITotpService
     {
-        private static long timeWindowUsedCurrent = new();
+        private static readonly HttpClient _httpClient = new HttpClient();
+        private static readonly IAsyncPolicy<HttpResponseMessage> _retryPolicy =
+            HttpPolicyExtensions
+                .HandleTransientHttpError()
+                .OrResult(r => r.StatusCode == System.Net.HttpStatusCode.BadGateway)
+                .OrResult(r => r.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable)
+                .WaitAndRetryAsync(
+                    retryCount: 4,
+                    sleepDurationProvider: attempt =>
+                        TimeSpan.FromMilliseconds(500 * Math.Pow(2, attempt))
+                        + TimeSpan.FromMilliseconds(new Random().Next(0, 300)),
+                    onRetry: (result, timespan, retryAttempt, _) =>
+                    {
+                        // Retry with exponential backoff and jitter
+                    });
+
+        private static readonly ConcurrentDictionary<string, long> _usedTimeWindows =
+            new ConcurrentDictionary<string, long>();
 
         private const string issuer = "EcommerceWebApi";
 
@@ -60,10 +83,28 @@ namespace EcommerceWebApi.Authentication
                 && uri.Host == "totp"
             )
             {
-                var queryParameters = HttpUtility.ParseQueryString(uri.Query);
-                if (queryParameters["secret"] != null && queryParameters["issuer"] == issuer)
+                var query = uri.Query.TrimStart('?');
+                var queryDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (!string.IsNullOrEmpty(query))
                 {
-                    secret = queryParameters["secret"];
+                    foreach (var param in query.Split('&'))
+                    {
+                        var idx = param.IndexOf('=');
+                        if (idx > 0)
+                        {
+                            var key = System.Net.WebUtility.UrlDecode(param.Substring(0, idx));
+                            var value = System.Net.WebUtility.UrlDecode(param.Substring(idx + 1));
+                            if (key != null)
+                            {
+                                queryDict[key] = value ?? "";
+                            }
+                        }
+                    }
+                }
+                if (queryDict.TryGetValue("secret", out string? secretValue) && secretValue != null
+                    && queryDict.TryGetValue("issuer", out string? issuerValue) && issuerValue == issuer)
+                {
+                    secret = secretValue;
                     return true;
                 }
             }
@@ -71,14 +112,17 @@ namespace EcommerceWebApi.Authentication
             return false;
         }
 
-        public bool ValidateTotp(string? base32Secret, string totp)
+        public async Task<bool> ValidateTotpAsync(
+            string? base32Secret,
+            string totp,
+            CancellationToken ct = default)
         {
             try
             {
                 var secret = Base32Encoding.ToBytes(base32Secret);
 
                 // Get exact time for TOTP
-                DateTime exactTime = GetNistTime();
+                DateTime exactTime = await GetNistTimeAsync(ct).ConfigureAwait(false);
 
                 // Validate TOTP
                 var correction = new TimeCorrection(exactTime);
@@ -90,11 +134,12 @@ namespace EcommerceWebApi.Authentication
                 );
 
                 // Check if TOTP has been used
-                if (timeWindowUsedCurrent == timeWindowUsed)
+                string key = totp;
+                if (_usedTimeWindows.TryGetValue(key, out long previousWindow) && previousWindow == timeWindowUsed)
                 {
                     return false;
                 }
-                timeWindowUsedCurrent = timeWindowUsed;
+                _usedTimeWindows[key] = timeWindowUsed;
 
                 return verify;
             }
@@ -104,13 +149,13 @@ namespace EcommerceWebApi.Authentication
             }
         }
 
-        public static DateTime GetNistTime()
+        public static async Task<DateTime> GetNistTimeAsync(CancellationToken ct = default)
         {
             // Get UTC time from the response header of request to "http://www.google.com"
-            using var httpClient = new HttpClient();
             try
             {
-                using var response = httpClient.GetAsync("http://www.google.com").Result;
+                using var response = await _retryPolicy.ExecuteAsync(() =>
+                    _httpClient.GetAsync("http://www.google.com", ct)).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode && response.Headers.Date != null)
                 {
                     return DateTime.ParseExact(

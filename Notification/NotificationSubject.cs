@@ -18,7 +18,7 @@
         {
             foreach (var observer in _observers)
             {
-                await observer.UpdateAsync(userId, message);
+                await observer.UpdateAsync(userId, message).ConfigureAwait(false);
             }
         }
     }

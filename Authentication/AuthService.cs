@@ -61,10 +61,10 @@ namespace EcommerceWebApi.Authentication
 
         public async Task<AuthResult> LoginSecondFactor(string totp, HttpContext context)
         {
-            bool validated = _totpService.ValidateTotp(
+            bool validated = await _totpService.ValidateTotpAsync(
                 base32Secret: CurrentUser.SecretCode,
                 totp: totp
-            );
+            ).ConfigureAwait(false);
             if (!validated)
             {
                 return AuthResult.InvalidCredentials;
@@ -135,7 +135,7 @@ namespace EcommerceWebApi.Authentication
                 return AuthResult.InvalidCredentials;
             }
 
-            bool validated = _totpService.ValidateTotp(base32Secret: secret, totp: totp);
+            bool validated = await _totpService.ValidateTotpAsync(base32Secret: secret, totp: totp).ConfigureAwait(false);
             if (!validated)
             {
                 return AuthResult.InvalidCredentials;

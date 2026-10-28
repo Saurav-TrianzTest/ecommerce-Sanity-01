@@ -86,7 +86,7 @@ namespace EcommerceWebApi.Services
         {
             try
             {
-                var result = await _unitOfWork.Products.UpdateAsync(product);
+                var result = await _unitOfWork.Products.UpdateAsync(product).ConfigureAwait(false);
                 return result;
             }
             catch

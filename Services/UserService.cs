@@ -38,9 +38,19 @@ namespace EcommerceWebApi.Services
             return _unitOfWork.Users.GetById(id);
         }
 
+        public async Task<User?> GetUserByIdAsync(string id)
+        {
+            return await Task.Run(() => _unitOfWork.Users.GetById(id)).ConfigureAwait(false);
+        }
+
         public User? GetUserByToken(string token)
         {
             return _unitOfWork.Users.GetByToken(token);
+        }
+
+        public async Task<User?> GetUserByTokenAsync(string token)
+        {
+            return await Task.Run(() => _unitOfWork.Users.GetByToken(token)).ConfigureAwait(false);
         }
 
         public User? GetUserByName(string name)
@@ -65,7 +75,7 @@ namespace EcommerceWebApi.Services
         {
             try
             {
-                var result = await _unitOfWork.Users.UpdateAsync(user);
+                var result = await _unitOfWork.Users.UpdateAsync(user).ConfigureAwait(false);
                 return result;
             }
             catch
