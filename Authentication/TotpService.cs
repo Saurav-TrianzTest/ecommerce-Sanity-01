@@ -1,6 +1,7 @@
 ﻿using OtpNet;
+using System.Collections.Specialized;
 using System.Globalization;
-using System.Web;
+using System.Net;
 
 namespace EcommerceWebApi.Authentication
 {
@@ -60,7 +61,7 @@ namespace EcommerceWebApi.Authentication
                 && uri.Host == "totp"
             )
             {
-                var queryParameters = HttpUtility.ParseQueryString(uri.Query);
+                var queryParameters = ParseQueryString(uri.Query);
                 if (queryParameters["secret"] != null && queryParameters["issuer"] == issuer)
                 {
                     secret = queryParameters["secret"];
@@ -71,14 +72,39 @@ namespace EcommerceWebApi.Authentication
             return false;
         }
 
-        public bool ValidateTotp(string? base32Secret, string totp)
+        private static NameValueCollection ParseQueryString(string query)
+        {
+            var result = new NameValueCollection();
+            if (string.IsNullOrEmpty(query))
+            {
+                return result;
+            }
+
+            var trimmed = query.TrimStart('?');
+            if (string.IsNullOrEmpty(trimmed))
+            {
+                return result;
+            }
+
+            foreach (var pair in trimmed.Split('&'))
+            {
+                var parts = pair.Split('=', 2);
+                var key = WebUtility.UrlDecode(parts[0]);
+                var value = parts.Length > 1 ? WebUtility.UrlDecode(parts[1]) : string.Empty;
+                result[key] = value;
+            }
+
+            return result;
+        }
+
+        public async Task<bool> ValidateTotp(string? base32Secret, string totp)
         {
             try
             {
                 var secret = Base32Encoding.ToBytes(base32Secret);
 
                 // Get exact time for TOTP
-                DateTime exactTime = GetNistTime();
+                DateTime exactTime = await GetNistTimeAsync();
 
                 // Validate TOTP
                 var correction = new TimeCorrection(exactTime);
@@ -104,13 +130,13 @@ namespace EcommerceWebApi.Authentication
             }
         }
 
-        public static DateTime GetNistTime()
+        public static async Task<DateTime> GetNistTimeAsync()
         {
-            // Get UTC time from the response header of request to "http://www.google.com"
+            // Get UTC time from the response header of request to "https://www.google.com"
             using var httpClient = new HttpClient();
             try
             {
-                using var response = httpClient.GetAsync("http://www.google.com").Result;
+                using var response = await httpClient.GetAsync("https://www.google.com");
                 if (response.IsSuccessStatusCode && response.Headers.Date != null)
                 {
                     return DateTime.ParseExact(
