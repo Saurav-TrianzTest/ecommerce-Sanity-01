@@ -6,12 +6,10 @@ using EcommerceWebApi.Services;
 using Serilog;
 using Serilog.Events;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.SignalR;
 
-var builder = WebApplication.CreateBuilder(args);
-ConfigurationManager configuration = builder.Configuration;
-
-var logger = new LoggerConfiguration().MinimumLevel
-    .Debug()
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
     .Enrich.FromLogContext()
     .WriteTo.File(
@@ -21,7 +19,11 @@ var logger = new LoggerConfiguration().MinimumLevel
         rollingInterval: RollingInterval.Day
     )
     .CreateLogger();
-builder.Logging.AddSerilog(logger);
+
+var builder = WebApplication.CreateBuilder(args);
+ConfigurationManager configuration = builder.Configuration;
+
+builder.Host.UseSerilog();
 
 builder.Services.AddControllers();
 builder.Services
@@ -29,7 +31,7 @@ builder.Services
     .AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 
 builder.Services.AddEndpointsApiExplorer();
-// .NET 10: Use built-in OpenAPI support instead of Swashbuckle
+// .NET 10: Use built-in OpenAPI support
 builder.Services.AddOpenApi();
 
 builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("ApplicationSettings"));
@@ -60,6 +62,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddSignalR();
 
 builder.Services.AddSingleton<NotificationSubject>();
+builder.Services.AddScoped<NotificationObserver>();
 
 var app = builder.Build();
 if (app.Environment.IsDevelopment())
