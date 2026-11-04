@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  ecommercewebapi:
+    image: ecommercewebapi:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ecommercewebapi
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5000
+      - SIGNALR_PORT=5000
+      - REDIS_CONNECTION_STRING=${REDIS_CONNECTION_STRING:-}
+      - ApplicationSettings__Secret=${APPLICATION_SECRET:-IHIdpkcABXxdUbq4TOSSECkJWP7yVvUc}
+    volumes:
+      - ./Logs:/app/Logs
+      - ./database.json:/app/database.json
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

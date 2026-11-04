@@ -1,0 +1,54 @@
+# .NET Build Artifacts
+bin/
+obj/
+publish/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# VS Code
+.vscode/
+
+# Rider
+.idea/
+
+# Logs
+Logs/
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+README*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test results
+TestResults/
+coverage/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+
+# Launch settings (dev only)
+Properties/launchSettings.json
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Temporary files
+*.tmp
+*.temp
