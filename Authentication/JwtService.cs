@@ -1,4 +1,4 @@
-﻿using EcommerceWebApi.Entities;
+using EcommerceWebApi.Entities;
 using EcommerceWebApi.Services;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -81,11 +81,17 @@ namespace EcommerceWebApi.Authentication
 
         private static RefreshToken GenerateRefreshToken()
         {
+            // Refresh token expiry is externalized via REFRESH_TOKEN_EXPIRY_DAYS env var for container deployments (cz-dotnet-1004)
+            int refreshTokenExpiryDays = int.TryParse(
+                Environment.GetEnvironmentVariable("REFRESH_TOKEN_EXPIRY_DAYS"), out int days)
+                ? days
+                : 7;
+
             // Create refresh token
             var refreshToken = new RefreshToken()
             {
                 Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                Expires = DateTime.Now.AddDays(7),
+                Expires = DateTime.Now.AddDays(refreshTokenExpiryDays),
                 Created = DateTime.Now
             };
 

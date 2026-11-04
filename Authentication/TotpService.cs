@@ -1,4 +1,5 @@
-﻿using OtpNet;
+using Microsoft.Extensions.Caching.Distributed;
+using OtpNet;
 using System.Globalization;
 using System.Web;
 
@@ -6,9 +7,16 @@ namespace EcommerceWebApi.Authentication
 {
     public class TotpService : ITotpService
     {
-        private static long timeWindowUsedCurrent = new();
+        // Redis-backed distributed cache replaces static in-memory timeWindowUsedCurrent for TOTP replay protection (cz-dotnet-1004)
+        private readonly IDistributedCache _distributedCache;
+        private const string TimeWindowCacheKey = "TotpService:TimeWindowUsedCurrent";
 
         private const string issuer = "EcommerceWebApi";
+
+        public TotpService(IDistributedCache distributedCache)
+        {
+            _distributedCache = distributedCache;
+        }
 
         public string GenerateBase32Secret()
         {
@@ -89,12 +97,20 @@ namespace EcommerceWebApi.Authentication
                     VerificationWindow.RfcSpecifiedNetworkDelay
                 );
 
-                // Check if TOTP has been used
+                // Check if TOTP has been used - use Redis distributed cache instead of static in-memory field (cz-dotnet-1004)
+                var cachedWindowStr = _distributedCache.GetString(TimeWindowCacheKey);
+                long timeWindowUsedCurrent = cachedWindowStr != null ? long.Parse(cachedWindowStr) : 0L;
+
                 if (timeWindowUsedCurrent == timeWindowUsed)
                 {
                     return false;
                 }
-                timeWindowUsedCurrent = timeWindowUsed;
+
+                // Persist the used time window to Redis so all pods share replay protection state (cz-dotnet-1004)
+                _distributedCache.SetString(TimeWindowCacheKey, timeWindowUsed.ToString(), new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+                });
 
                 return verify;
             }
@@ -106,11 +122,12 @@ namespace EcommerceWebApi.Authentication
 
         public static DateTime GetNistTime()
         {
-            // Get UTC time from the response header of request to "http://www.google.com"
+            // Get UTC time from the response header of request to the configured time server URL
+            var timeServerUrl = Environment.GetEnvironmentVariable("TIME_SERVER_URL") ?? "http://www.google.com";
             using var httpClient = new HttpClient();
             try
             {
-                using var response = httpClient.GetAsync("http://www.google.com").Result;
+                using var response = httpClient.GetAsync(timeServerUrl).Result;
                 if (response.IsSuccessStatusCode && response.Headers.Date != null)
                 {
                     return DateTime.ParseExact(

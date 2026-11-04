@@ -45,6 +45,23 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Redis-backed distributed cache for Blazor Server circuit state persistence on EKS with ElastiCache (cz-dotnet-1004)
+// Configure REDIS_CONNECTION_STRING environment variable to point to Amazon ElastiCache for Redis endpoint
+var redisConnectionString = Environment.GetEnvironmentVariable("REDIS_CONNECTION_STRING");
+if (!string.IsNullOrEmpty(redisConnectionString))
+{
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnectionString;
+        options.InstanceName = "EcommerceWebApi:";
+    });
+}
+else
+{
+    // Fallback to in-memory distributed cache for local development when Redis is not configured
+    builder.Services.AddDistributedMemoryCache();
+}
+
 builder.Services.AddScoped<UnitOfWork>();
 
 builder.Services.AddScoped<UserService>();
@@ -55,6 +72,18 @@ builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<TotpService>();
 builder.Services.AddScoped<AuthorizeFilter>();
 builder.Services.AddScoped<AuthService>();
+
+// cz-dotnet-1005: Externalize Blazor Server SignalR hub port via Kestrel environment variables
+// Configure SIGNALR_PORT environment variable (e.g., via Kubernetes ConfigMap) to set the SignalR hub port dynamically.
+// Falls back to port 5000 when the environment variable is not set (local development).
+var signalRPort = int.TryParse(Environment.GetEnvironmentVariable("SIGNALR_PORT"), out var parsedPort)
+    ? parsedPort
+    : 5000;
+
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.ListenAnyIP(signalRPort);
+});
 
 builder.Services.AddSignalR();
 

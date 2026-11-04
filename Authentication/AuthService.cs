@@ -1,6 +1,8 @@
-﻿using EcommerceWebApi.Entities;
+using EcommerceWebApi.Entities;
 using EcommerceWebApi.Services;
+using Microsoft.Extensions.Caching.Distributed;
 using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace EcommerceWebApi.Authentication
 {
@@ -9,13 +11,15 @@ namespace EcommerceWebApi.Authentication
         private readonly IUserService _userService;
         private readonly ITotpService _totpService;
         private readonly IJwtService _jwtService;
-        public User CurrentUser { get; internal set; } = null!;
+        // Redis-backed distributed cache replaces in-memory CurrentUser circuit state (cz-dotnet-1004)
+        private readonly IDistributedCache _distributedCache;
 
-        public AuthService(UserService userService, TotpService totpService, JwtService jwtService)
+        public AuthService(UserService userService, TotpService totpService, JwtService jwtService, IDistributedCache distributedCache)
         {
             _userService = userService;
             _totpService = totpService;
             _jwtService = jwtService;
+            _distributedCache = distributedCache;
         }
 
         public enum AuthResult
@@ -26,6 +30,31 @@ namespace EcommerceWebApi.Authentication
             NeedSecondFactorAuth,
             Success,
             Fail
+        }
+
+        // CurrentUser is now persisted in Redis distributed cache instead of in-memory (cz-dotnet-1004)
+        public User CurrentUser
+        {
+            get
+            {
+                var json = _distributedCache.GetString("AuthService:CurrentUser");
+                return json != null ? JsonSerializer.Deserialize<User>(json)! : null!;
+            }
+            internal set
+            {
+                if (value == null)
+                {
+                    _distributedCache.Remove("AuthService:CurrentUser");
+                }
+                else
+                {
+                    var json = JsonSerializer.Serialize(value);
+                    _distributedCache.SetString("AuthService:CurrentUser", json, new DistributedCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
+                    });
+                }
+            }
         }
 
         private static bool CheckPassword(User user, string password)
