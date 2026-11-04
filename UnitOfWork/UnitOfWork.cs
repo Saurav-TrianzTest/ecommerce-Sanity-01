@@ -1,5 +1,6 @@
 ﻿using EcommerceWebApi.Repositories;
 using JsonFlatFileDataStore;
+using Microsoft.Extensions.Configuration;
 
 namespace EcommerceWebApi
 {
@@ -15,9 +16,10 @@ namespace EcommerceWebApi
 
         public IOrderRepository Orders { get; private set; }
 
-        public UnitOfWork()
+        public UnitOfWork(IConfiguration configuration)
         {
-            _store = new DataStore("database.json");
+            var filePath = configuration["Database:FilePath"] ?? "database.json";
+            _store = new DataStore(filePath);
             Users = new UserRepository(this, _store);
             Products = new ProductRepository(this, _store);
             Orders = new OrderRepository(this, _store);

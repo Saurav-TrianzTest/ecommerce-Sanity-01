@@ -1,5 +1,8 @@
 ﻿using OtpNet;
+using Polly;
+using Polly.Extensions.Http;
 using System.Globalization;
+using System.Net.Http;
 using System.Web;
 
 namespace EcommerceWebApi.Authentication
@@ -9,6 +12,15 @@ namespace EcommerceWebApi.Authentication
         private static long timeWindowUsedCurrent = new();
 
         private const string issuer = "EcommerceWebApi";
+
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ILogger<TotpService> _logger;
+
+        public TotpService(IHttpClientFactory httpClientFactory, ILogger<TotpService> logger)
+        {
+            _httpClientFactory = httpClientFactory;
+            _logger = logger;
+        }
 
         public string GenerateBase32Secret()
         {
@@ -71,14 +83,14 @@ namespace EcommerceWebApi.Authentication
             return false;
         }
 
-        public bool ValidateTotp(string? base32Secret, string totp)
+        public async Task<bool> ValidateTotp(string? base32Secret, string totp)
         {
             try
             {
                 var secret = Base32Encoding.ToBytes(base32Secret);
 
                 // Get exact time for TOTP
-                DateTime exactTime = GetNistTime();
+                DateTime exactTime = await GetNistTimeAsync();
 
                 // Validate TOTP
                 var correction = new TimeCorrection(exactTime);
@@ -104,13 +116,25 @@ namespace EcommerceWebApi.Authentication
             }
         }
 
-        public static DateTime GetNistTime()
+        public async Task<DateTime> GetNistTimeAsync()
         {
             // Get UTC time from the response header of request to "http://www.google.com"
-            using var httpClient = new HttpClient();
+            var httpClient = _httpClientFactory.CreateClient();
+            var retryPolicy = HttpPolicyExtensions
+                .HandleTransientHttpError()
+                .Or<HttpRequestException>()
+                .WaitAndRetryAsync(
+                    retryCount: 3,
+                    sleepDurationProvider: retryAttempt =>
+                        TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+
             try
             {
-                using var response = httpClient.GetAsync("http://www.google.com").Result;
+                var response = await retryPolicy.ExecuteAsync(async () =>
+                {
+                    return await httpClient.GetAsync("http://www.google.com");
+                });
+
                 if (response.IsSuccessStatusCode && response.Headers.Date != null)
                 {
                     return DateTime.ParseExact(

@@ -43,9 +43,19 @@ namespace EcommerceWebApi.Services
             return _unitOfWork.Users.GetByToken(token);
         }
 
+        public Task<User?> GetUserByTokenAsync(string token)
+        {
+            return Task.FromResult(_unitOfWork.Users.GetByToken(token));
+        }
+
         public User? GetUserByName(string name)
         {
             return _unitOfWork.Users.GetByName(name);
+        }
+
+        public Task<User?> GetUserByIdAsync(string id)
+        {
+            return Task.FromResult(_unitOfWork.Users.GetById(id));
         }
 
         public async Task<bool> InsertUserAsync(User user)

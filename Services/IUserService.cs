@@ -12,6 +12,8 @@ namespace EcommerceWebApi.Services
         User? GetUserById(string id);
         User? GetUserByName(string name);
         User? GetUserByToken(string token);
+        Task<User?> GetUserByIdAsync(string id);
+        Task<User?> GetUserByTokenAsync(string token);
         Task<bool> InsertUserAsync(User user);
         Task<bool> UpdateUserAsync(User user);
         Task<bool> UpdateUserPropertyAsync<T>(User user, string property, T value);

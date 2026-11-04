@@ -7,7 +7,7 @@ using System.IdentityModel.Tokens.Jwt;
 
 namespace EcommerceWebApi.Filters
 {
-    public class AuthorizeFilter : IAuthorizationFilter
+    public class AuthorizeFilter : IAsyncAuthorizationFilter
     {
         private readonly AuthService _authService;
         private readonly UserService _userService;
@@ -27,7 +27,7 @@ namespace EcommerceWebApi.Filters
             _logger = logger;
         }
 
-        public void OnAuthorization(AuthorizationFilterContext context)
+        public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
         {
             try
             {
@@ -52,15 +52,15 @@ namespace EcommerceWebApi.Filters
 
                 if (!allowFirstFactor)
                 {
-                    if (!CheckRefreshToken(refreshTokenString, context, out User? user))
+                    var (refreshTokenValid, user) = await CheckRefreshTokenAsync(refreshTokenString, context);
+                    if (!refreshTokenValid)
                     {
                         return;
                     }
-                    ;
 
                     if (string.IsNullOrEmpty(accessTokenString) && user != null)
                     {
-                        _ = _jwtService.GenerateJWT(
+                        await _jwtService.GenerateJWT(
                             user,
                             isSecondFactorChecked: true,
                             context.HttpContext
@@ -70,50 +70,41 @@ namespace EcommerceWebApi.Filters
                     }
                     else
                     {
-                        if (
-                            !CheckAccessToken(
-                                accessTokenString,
-                                user,
-                                context,
-                                out JwtSecurityToken accessToken,
-                                out User currentUser
-                            )
-                        )
+                        var (accessTokenValid, accessToken, currentUser) = await CheckAccessTokenAsync(
+                            accessTokenString,
+                            user,
+                            context
+                        );
+                        if (!accessTokenValid)
                         {
                             return;
                         }
 
-                        if (requiredRoles.Any() && !CheckRole(accessToken, requiredRoles, context))
+                        if (requiredRoles.Any() && accessToken != null && !await CheckRoleAsync(accessToken, requiredRoles, context))
                         {
                             return;
                         }
-                        ;
 
-                        _authService.CurrentUser = currentUser;
+                        _authService.CurrentUser = currentUser!;
                     }
                 }
                 else
                 {
-                    if (
-                        !CheckAccessToken(
-                            accessTokenString,
-                            null,
-                            context,
-                            out JwtSecurityToken accessToken,
-                            out User currentUser
-                        )
-                    )
+                    var (accessTokenValid, accessToken, currentUser) = await CheckAccessTokenAsync(
+                        accessTokenString,
+                        null,
+                        context
+                    );
+                    if (!accessTokenValid)
                     {
                         return;
                     }
-                    ;
-                    if (requiredRoles.Any() && !CheckRole(accessToken, requiredRoles, context))
+                    if (requiredRoles.Any() && accessToken != null && !await CheckRoleAsync(accessToken, requiredRoles, context))
                     {
                         return;
                     }
-                    ;
 
-                    _authService.CurrentUser = currentUser;
+                    _authService.CurrentUser = currentUser!;
 
                     context.Result = new ContentResult()
                     {
@@ -135,16 +126,13 @@ namespace EcommerceWebApi.Filters
             }
         }
 
-        private bool CheckRefreshToken(
+        private async Task<(bool isValid, User? user)> CheckRefreshTokenAsync(
             string? refreshTokenString,
-            AuthorizationFilterContext context,
-            out User? user
+            AuthorizationFilterContext context
         )
         {
-            user = null!;
             try
             {
-                user = null;
                 if (string.IsNullOrEmpty(refreshTokenString))
                 {
                     context.Result = new ContentResult()
@@ -152,22 +140,22 @@ namespace EcommerceWebApi.Filters
                         Content = "Unauthorized",
                         StatusCode = StatusCodes.Status401Unauthorized
                     };
-                    return false;
+                    return (false, null);
                 }
 
-                user = _userService.GetUserByToken(token: refreshTokenString);
+                var user = await _userService.GetUserByTokenAsync(refreshTokenString);
 
-                if (user == null || user.RefreshToken.Expires < DateTime.Now)
+                if (user == null || user.RefreshToken.Expires < DateTime.UtcNow)
                 {
                     context.Result = new ContentResult()
                     {
                         Content = "Unauthorized",
                         StatusCode = StatusCodes.Status401Unauthorized
                     };
-                    return false;
+                    return (false, null);
                 }
 
-                return true;
+                return (true, user);
             }
             catch (Exception ex)
             {
@@ -177,22 +165,19 @@ namespace EcommerceWebApi.Filters
                     Content = "Unauthorized",
                     StatusCode = StatusCodes.Status401Unauthorized
                 };
-                return false;
+                return (false, null);
             }
         }
 
-        private bool CheckAccessToken(
+        private async Task<(bool isValid, JwtSecurityToken? accessToken, User? currentUser)> CheckAccessTokenAsync(
             string? accessTokenString,
             User? user,
-            AuthorizationFilterContext context,
-            out JwtSecurityToken accessToken,
-            out User currentUser
+            AuthorizationFilterContext context
         )
         {
-            accessToken = null!;
             try
             {
-                accessToken = new JwtSecurityTokenHandler().ReadJwtToken(accessTokenString);
+                var accessToken = new JwtSecurityTokenHandler().ReadJwtToken(accessTokenString);
                 var accessTokenId = accessToken.Claims.FirstOrDefault(x => x.Type == "id");
                 var isSecondFactorChecked = accessToken.Claims.FirstOrDefault(
                     x => x.Type == "status"
@@ -200,11 +185,15 @@ namespace EcommerceWebApi.Filters
 
                 if (accessTokenId == null || isSecondFactorChecked == null)
                 {
-                    currentUser = null!;
-                    return false;
+                    context.Result = new ContentResult()
+                    {
+                        Content = "Unauthorized",
+                        StatusCode = StatusCodes.Status401Unauthorized
+                    };
+                    return (false, null, null);
                 }
 
-                currentUser = _userService.GetUserById(accessTokenId.Value)!;
+                var currentUser = await _userService.GetUserByIdAsync(accessTokenId.Value);
 
                 if (
                     (
@@ -214,29 +203,28 @@ namespace EcommerceWebApi.Filters
                     ) || (user == null && currentUser != null)
                 )
                 {
-                    return true;
+                    return (true, accessToken, currentUser);
                 }
                 context.Result = new ContentResult()
                 {
                     Content = "Unauthorized",
                     StatusCode = StatusCodes.Status401Unauthorized
                 };
-                return false;
+                return (false, null, null);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"{ex.Message} - {ex.InnerException?.Message}");
-                currentUser = null!;
                 context.Result = new ContentResult()
                 {
                     Content = "Unauthorized",
                     StatusCode = StatusCodes.Status401Unauthorized
                 };
-                return false;
+                return (false, null, null);
             }
         }
 
-        private bool CheckRole(
+        private async Task<bool> CheckRoleAsync(
             JwtSecurityToken accessToken,
             IEnumerable<string>? requiredRoles,
             AuthorizationFilterContext context

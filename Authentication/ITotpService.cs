@@ -5,6 +5,6 @@
         string GenerateBase32Secret();
         string? GenerateQrCode(string? base32Secret, string? username);
         string? GetSecretFromQrCode(string qrCode);
-        bool ValidateTotp(string? base32Secret, string totp);
+        Task<bool> ValidateTotp(string? base32Secret, string totp);
     }
 }
