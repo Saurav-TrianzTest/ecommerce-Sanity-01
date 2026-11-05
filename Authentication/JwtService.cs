@@ -40,7 +40,8 @@ namespace EcommerceWebApi.Authentication
                         new Claim("role", user.Role)
                     }
                 ),
-                Expires = DateTime.Now.AddMinutes(15),
+                // Use DateTime.UtcNow for proper timezone handling in .NET 10
+                Expires = DateTime.UtcNow.AddMinutes(15),
                 SigningCredentials = new SigningCredentials(
                     new SymmetricSecurityKey(key),
                     SecurityAlgorithms.HmacSha512Signature
@@ -70,7 +71,8 @@ namespace EcommerceWebApi.Authentication
                 encrypterToken,
                 new CookieOptions
                 {
-                    Expires = DateTime.Now.AddMinutes(15),
+                    // Use DateTime.UtcNow for proper timezone handling in .NET 10
+                    Expires = DateTime.UtcNow.AddMinutes(15),
                     HttpOnly = true,
                     Secure = true,
                     IsEssential = true,
@@ -85,8 +87,9 @@ namespace EcommerceWebApi.Authentication
             var refreshToken = new RefreshToken()
             {
                 Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                Expires = DateTime.Now.AddDays(7),
-                Created = DateTime.Now
+                // Use DateTime.UtcNow for proper timezone handling in .NET 10
+                Expires = DateTime.UtcNow.AddDays(7),
+                Created = DateTime.UtcNow
             };
 
             return refreshToken;
